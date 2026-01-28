@@ -67,9 +67,14 @@ impl TokenManager {
             }
         };
 
-        let credentials =
-            base64::Engine::encode(&base64::engine::general_purpose::STANDARD,
-                format!("{}:{}", self.client_id.expose_secret(), self.client_secret.expose_secret()));
+        let credentials = base64::Engine::encode(
+            &base64::engine::general_purpose::STANDARD,
+            format!(
+                "{}:{}",
+                self.client_id.expose_secret(),
+                self.client_secret.expose_secret()
+            ),
+        );
 
         let resp = self
             .http
@@ -143,9 +148,14 @@ impl TokenManager {
     }
 
     async fn exchange_code(&self, code: &str) -> Result<()> {
-        let credentials =
-            base64::Engine::encode(&base64::engine::general_purpose::STANDARD,
-                format!("{}:{}", self.client_id.expose_secret(), self.client_secret.expose_secret()));
+        let credentials = base64::Engine::encode(
+            &base64::engine::general_purpose::STANDARD,
+            format!(
+                "{}:{}",
+                self.client_id.expose_secret(),
+                self.client_secret.expose_secret()
+            ),
+        );
 
         let resp = self
             .http

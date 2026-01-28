@@ -29,10 +29,7 @@ impl HistoricalDataService {
         Ok(history.candles)
     }
 
-    pub async fn get_recent_bars(
-        &self,
-        symbols: &[&str],
-    ) -> Result<HashMap<String, Vec<Candle>>> {
+    pub async fn get_recent_bars(&self, symbols: &[&str]) -> Result<HashMap<String, Vec<Candle>>> {
         let mut result = HashMap::new();
         for &sym in symbols {
             match self.get_daily_bars(sym, 10).await {

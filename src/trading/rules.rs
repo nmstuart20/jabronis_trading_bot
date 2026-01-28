@@ -134,9 +134,7 @@ impl TradingRules {
         if let Some(ticker) = &decision.ticker {
             let today = Utc::now().date_naive();
             let bought_today = self.trade_history.iter().any(|t| {
-                t.ticker == *ticker
-                    && t.action == Action::Buy
-                    && t.timestamp.date_naive() == today
+                t.ticker == *ticker && t.action == Action::Buy && t.timestamp.date_naive() == today
             });
             if bought_today {
                 let day_trades = self.count_day_trades_rolling_5_days();

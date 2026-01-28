@@ -19,7 +19,10 @@ use std::sync::Arc;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
-#[command(name = "schwab-bot", about = "LLM-powered trading bot with Schwab integration")]
+#[command(
+    name = "schwab-bot",
+    about = "LLM-powered trading bot with Schwab integration"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -132,7 +135,8 @@ async fn run_trade_session(mode: TradingMode, force_dry_run: bool) -> anyhow::Re
         rules.set_dry_run(true);
     }
 
-    let mut executor = TradeExecutor::new(schwab.clone(), rules, settings.schwab.account_id.clone());
+    let mut executor =
+        TradeExecutor::new(schwab.clone(), rules, settings.schwab.account_id.clone());
 
     let watchlist: Vec<&str> = vec!["AAPL", "GOOGL", "MSFT", "AMZN", "NVDA", "SPY", "QQQ"];
 
@@ -287,7 +291,10 @@ async fn show_status() -> anyhow::Result<()> {
     if portfolio.positions.is_empty() {
         println!("No open positions.");
     } else {
-        println!("{:<8} {:>8} {:>10} {:>12} {:>10}", "Symbol", "Qty", "Avg Price", "Value", "P&L");
+        println!(
+            "{:<8} {:>8} {:>10} {:>12} {:>10}",
+            "Symbol", "Qty", "Avg Price", "Value", "P&L"
+        );
         println!("{}", "-".repeat(52));
         for p in &portfolio.positions {
             println!(
@@ -356,12 +363,13 @@ async fn build_portfolio(
     let account = schwab.get_account(account_id).await?;
     let positions = schwab.get_positions(account_id).await?;
 
-    let balances = account.current_balances.unwrap_or(
-        schwab_bot::schwab::models::AccountBalances {
-            cash_available_for_trading: rust_decimal::Decimal::ZERO,
-            liquidation_value: rust_decimal::Decimal::ZERO,
-        },
-    );
+    let balances =
+        account
+            .current_balances
+            .unwrap_or(schwab_bot::schwab::models::AccountBalances {
+                cash_available_for_trading: rust_decimal::Decimal::ZERO,
+                liquidation_value: rust_decimal::Decimal::ZERO,
+            });
 
     Ok(Portfolio {
         cash_available: balances.cash_available_for_trading,

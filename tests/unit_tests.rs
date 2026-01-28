@@ -123,7 +123,10 @@ mod response_parser {
         assert_eq!(decision.action, Action::Buy);
         assert_eq!(decision.ticker.as_deref(), Some("MSFT"));
         assert_eq!(decision.order_type, LlmOrderType::Limit);
-        assert_eq!(decision.limit_price, Some(Decimal::from_str("350.00").unwrap()));
+        assert_eq!(
+            decision.limit_price,
+            Some(Decimal::from_str("350.00").unwrap())
+        );
     }
 
     #[test]
@@ -343,10 +346,15 @@ mod trading_rules {
     fn blocked_ticker_rejected() {
         let rules = TradingRules::new(&make_trading_config());
         let decision = make_buy_decision("GME", 10);
-        let portfolio = make_portfolio(Decimal::from_str("50000").unwrap(), Decimal::from_str("100000").unwrap());
+        let portfolio = make_portfolio(
+            Decimal::from_str("50000").unwrap(),
+            Decimal::from_str("100000").unwrap(),
+        );
         let quote = make_quote("GME", Decimal::from_str("20").unwrap());
 
-        let err = rules.validate_trade(&decision, &portfolio, &quote).unwrap_err();
+        let err = rules
+            .validate_trade(&decision, &portfolio, &quote)
+            .unwrap_err();
         assert!(matches!(err, RuleViolation::TickerNotAllowed(_)));
     }
 
@@ -354,7 +362,10 @@ mod trading_rules {
     fn blocked_ticker_case_insensitive() {
         let rules = TradingRules::new(&make_trading_config());
         let decision = make_buy_decision("gme", 10);
-        let portfolio = make_portfolio(Decimal::from_str("50000").unwrap(), Decimal::from_str("100000").unwrap());
+        let portfolio = make_portfolio(
+            Decimal::from_str("50000").unwrap(),
+            Decimal::from_str("100000").unwrap(),
+        );
         let quote = make_quote("gme", Decimal::from_str("20").unwrap());
 
         assert!(rules.validate_trade(&decision, &portfolio, &quote).is_err());
@@ -366,7 +377,10 @@ mod trading_rules {
         config.allowed_tickers = Some(vec!["AAPL".into(), "MSFT".into()]);
         let rules = TradingRules::new(&config);
 
-        let portfolio = make_portfolio(Decimal::from_str("50000").unwrap(), Decimal::from_str("100000").unwrap());
+        let portfolio = make_portfolio(
+            Decimal::from_str("50000").unwrap(),
+            Decimal::from_str("100000").unwrap(),
+        );
 
         // Allowed ticker passes
         let decision = make_buy_decision("AAPL", 10);
@@ -376,7 +390,9 @@ mod trading_rules {
         // Non-whitelisted ticker fails
         let decision = make_buy_decision("NVDA", 10);
         let quote = make_quote("NVDA", Decimal::from_str("500").unwrap());
-        let err = rules.validate_trade(&decision, &portfolio, &quote).unwrap_err();
+        let err = rules
+            .validate_trade(&decision, &portfolio, &quote)
+            .unwrap_err();
         assert!(matches!(err, RuleViolation::TickerNotAllowed(_)));
     }
 
@@ -385,10 +401,15 @@ mod trading_rules {
         let rules = TradingRules::new(&make_trading_config());
         // 100 shares * $150 = $15,000 > $10,000 max
         let decision = make_buy_decision("AAPL", 100);
-        let portfolio = make_portfolio(Decimal::from_str("50000").unwrap(), Decimal::from_str("100000").unwrap());
+        let portfolio = make_portfolio(
+            Decimal::from_str("50000").unwrap(),
+            Decimal::from_str("100000").unwrap(),
+        );
         let quote = make_quote("AAPL", Decimal::from_str("150").unwrap());
 
-        let err = rules.validate_trade(&decision, &portfolio, &quote).unwrap_err();
+        let err = rules
+            .validate_trade(&decision, &portfolio, &quote)
+            .unwrap_err();
         assert!(matches!(err, RuleViolation::PositionTooLarge { .. }));
     }
 
@@ -401,11 +422,19 @@ mod trading_rules {
 
         // 100 shares * $150 = $15,000 = 15% of $100,000 > 10% max
         let decision = make_buy_decision("AAPL", 100);
-        let portfolio = make_portfolio(Decimal::from_str("50000").unwrap(), Decimal::from_str("100000").unwrap());
+        let portfolio = make_portfolio(
+            Decimal::from_str("50000").unwrap(),
+            Decimal::from_str("100000").unwrap(),
+        );
         let quote = make_quote("AAPL", Decimal::from_str("150").unwrap());
 
-        let err = rules.validate_trade(&decision, &portfolio, &quote).unwrap_err();
-        assert!(matches!(err, RuleViolation::PositionPercentageTooHigh { .. }));
+        let err = rules
+            .validate_trade(&decision, &portfolio, &quote)
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            RuleViolation::PositionPercentageTooHigh { .. }
+        ));
     }
 
     #[test]
@@ -413,10 +442,15 @@ mod trading_rules {
         let rules = TradingRules::new(&make_trading_config());
         // 50 shares * $150 = $7,500 > $5,000 cash
         let decision = make_buy_decision("AAPL", 50);
-        let portfolio = make_portfolio(Decimal::from_str("5000").unwrap(), Decimal::from_str("100000").unwrap());
+        let portfolio = make_portfolio(
+            Decimal::from_str("5000").unwrap(),
+            Decimal::from_str("100000").unwrap(),
+        );
         let quote = make_quote("AAPL", Decimal::from_str("150").unwrap());
 
-        let err = rules.validate_trade(&decision, &portfolio, &quote).unwrap_err();
+        let err = rules
+            .validate_trade(&decision, &portfolio, &quote)
+            .unwrap_err();
         assert!(matches!(err, RuleViolation::InsufficientCash { .. }));
     }
 
@@ -425,7 +459,10 @@ mod trading_rules {
         let rules = TradingRules::new(&make_trading_config());
         // 10 shares * $150 = $1,500 — well under all limits
         let decision = make_buy_decision("AAPL", 10);
-        let portfolio = make_portfolio(Decimal::from_str("50000").unwrap(), Decimal::from_str("100000").unwrap());
+        let portfolio = make_portfolio(
+            Decimal::from_str("50000").unwrap(),
+            Decimal::from_str("100000").unwrap(),
+        );
         let quote = make_quote("AAPL", Decimal::from_str("150").unwrap());
 
         assert!(rules.validate_trade(&decision, &portfolio, &quote).is_ok());
@@ -436,7 +473,10 @@ mod trading_rules {
         let rules = TradingRules::new(&make_trading_config());
         // Selling doesn't check position size / cash
         let decision = make_sell_decision("AAPL", 1000);
-        let portfolio = make_portfolio(Decimal::from_str("100").unwrap(), Decimal::from_str("100000").unwrap());
+        let portfolio = make_portfolio(
+            Decimal::from_str("100").unwrap(),
+            Decimal::from_str("100000").unwrap(),
+        );
         let quote = make_quote("AAPL", Decimal::from_str("150").unwrap());
 
         assert!(rules.validate_trade(&decision, &portfolio, &quote).is_ok());
@@ -448,10 +488,15 @@ mod trading_rules {
         rules.update_daily_pnl(Decimal::from_str("-500").unwrap()); // at max loss
 
         let decision = make_buy_decision("AAPL", 1);
-        let portfolio = make_portfolio(Decimal::from_str("50000").unwrap(), Decimal::from_str("100000").unwrap());
+        let portfolio = make_portfolio(
+            Decimal::from_str("50000").unwrap(),
+            Decimal::from_str("100000").unwrap(),
+        );
         let quote = make_quote("AAPL", Decimal::from_str("150").unwrap());
 
-        let err = rules.validate_trade(&decision, &portfolio, &quote).unwrap_err();
+        let err = rules
+            .validate_trade(&decision, &portfolio, &quote)
+            .unwrap_err();
         assert!(matches!(err, RuleViolation::DailyLossLimitReached));
     }
 
@@ -473,10 +518,15 @@ mod trading_rules {
         }
 
         let decision = make_buy_decision("AAPL", 1);
-        let portfolio = make_portfolio(Decimal::from_str("50000").unwrap(), Decimal::from_str("100000").unwrap());
+        let portfolio = make_portfolio(
+            Decimal::from_str("50000").unwrap(),
+            Decimal::from_str("100000").unwrap(),
+        );
         let quote = make_quote("AAPL", Decimal::from_str("150").unwrap());
 
-        let err = rules.validate_trade(&decision, &portfolio, &quote).unwrap_err();
+        let err = rules
+            .validate_trade(&decision, &portfolio, &quote)
+            .unwrap_err();
         assert!(matches!(err, RuleViolation::DailyTradeCountExceeded));
     }
 
@@ -516,10 +566,15 @@ mod trading_rules {
         });
 
         let decision = make_sell_decision("MSFT", 5);
-        let portfolio = make_portfolio(Decimal::from_str("50000").unwrap(), Decimal::from_str("100000").unwrap());
+        let portfolio = make_portfolio(
+            Decimal::from_str("50000").unwrap(),
+            Decimal::from_str("100000").unwrap(),
+        );
         let quote = make_quote("MSFT", Decimal::from_str("305").unwrap());
 
-        let err = rules.validate_trade(&decision, &portfolio, &quote).unwrap_err();
+        let err = rules
+            .validate_trade(&decision, &portfolio, &quote)
+            .unwrap_err();
         assert!(matches!(err, RuleViolation::DayTradeLimitExceeded));
     }
 
@@ -538,7 +593,10 @@ mod trading_rules {
         });
 
         let decision = make_sell_decision("AAPL", 10);
-        let portfolio = make_portfolio(Decimal::from_str("50000").unwrap(), Decimal::from_str("100000").unwrap());
+        let portfolio = make_portfolio(
+            Decimal::from_str("50000").unwrap(),
+            Decimal::from_str("100000").unwrap(),
+        );
         let quote = make_quote("AAPL", Decimal::from_str("155").unwrap());
 
         assert!(rules.validate_trade(&decision, &portfolio, &quote).is_ok());
@@ -547,7 +605,10 @@ mod trading_rules {
     #[test]
     fn constraints_reflect_state() {
         let mut rules = TradingRules::new(&make_trading_config());
-        let portfolio = make_portfolio(Decimal::from_str("50000").unwrap(), Decimal::from_str("100000").unwrap());
+        let portfolio = make_portfolio(
+            Decimal::from_str("50000").unwrap(),
+            Decimal::from_str("100000").unwrap(),
+        );
         let now = Utc::now();
 
         // Record 3 trades today
@@ -565,8 +626,14 @@ mod trading_rules {
 
         let constraints = rules.get_current_constraints(&portfolio);
         assert_eq!(constraints.trades_remaining_today, 7); // 10 - 3
-        assert_eq!(constraints.daily_loss_remaining, Decimal::from_str("300").unwrap()); // 500 - 200
-        assert_eq!(constraints.max_position_dollars, Decimal::from_str("10000").unwrap());
+        assert_eq!(
+            constraints.daily_loss_remaining,
+            Decimal::from_str("300").unwrap()
+        ); // 500 - 200
+        assert_eq!(
+            constraints.max_position_dollars,
+            Decimal::from_str("10000").unwrap()
+        );
     }
 
     #[test]
@@ -642,7 +709,10 @@ mod order_builders {
         ] {
             assert!(matches!(order.session, Session::Normal));
             assert!(matches!(order.duration, Duration::Day));
-            assert!(matches!(order.order_strategy_type, OrderStrategyType::Single));
+            assert!(matches!(
+                order.order_strategy_type,
+                OrderStrategyType::Single
+            ));
         }
     }
 }
@@ -656,7 +726,10 @@ mod portfolio_tests {
 
     #[test]
     fn total_value() {
-        let p = make_portfolio(Decimal::from_str("10000").unwrap(), Decimal::from_str("50000").unwrap());
+        let p = make_portfolio(
+            Decimal::from_str("10000").unwrap(),
+            Decimal::from_str("50000").unwrap(),
+        );
         assert_eq!(p.total_value(), Decimal::from_str("50000").unwrap());
     }
 
@@ -674,12 +747,18 @@ mod portfolio_tests {
             total_account_value: Decimal::from_str("11550").unwrap(),
         };
         assert!(p.position_for("AAPL").is_some());
-        assert_eq!(p.position_for("AAPL").unwrap().quantity, Decimal::from_str("10").unwrap());
+        assert_eq!(
+            p.position_for("AAPL").unwrap().quantity,
+            Decimal::from_str("10").unwrap()
+        );
     }
 
     #[test]
     fn position_for_not_found() {
-        let p = make_portfolio(Decimal::from_str("10000").unwrap(), Decimal::from_str("10000").unwrap());
+        let p = make_portfolio(
+            Decimal::from_str("10000").unwrap(),
+            Decimal::from_str("10000").unwrap(),
+        );
         assert!(p.position_for("AAPL").is_none());
     }
 }

@@ -153,10 +153,7 @@ impl SchwabClient {
         let auth = self.auth_header().await?;
         let resp = self
             .http
-            .post(format!(
-                "{}/accounts/{}/orders",
-                self.base_url, account_id
-            ))
+            .post(format!("{}/accounts/{}/orders", self.base_url, account_id))
             .header("Authorization", &auth)
             .json(order)
             .send()
@@ -177,10 +174,7 @@ impl SchwabClient {
         let auth = self.auth_header().await?;
         let resp = self
             .http
-            .get(format!(
-                "{}/accounts/{}/orders",
-                self.base_url, account_id
-            ))
+            .get(format!("{}/accounts/{}/orders", self.base_url, account_id))
             .header("Authorization", &auth)
             .send()
             .await?;

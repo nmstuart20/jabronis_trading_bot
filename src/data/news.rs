@@ -54,9 +54,7 @@ impl NewsService {
         if !resp.status().is_success() {
             let status = resp.status().as_u16();
             let body = resp.text().await.unwrap_or_default();
-            return Err(BotError::Other(format!(
-                "News API error {status}: {body}"
-            )));
+            return Err(BotError::Other(format!("News API error {status}: {body}")));
         }
 
         let data: serde_json::Value = resp.json().await?;
@@ -68,7 +66,10 @@ impl NewsService {
                 Some(NewsItem {
                     headline: a["title"].as_str()?.to_string(),
                     summary: a["description"].as_str().unwrap_or("").to_string(),
-                    source: a["source"]["name"].as_str().unwrap_or("unknown").to_string(),
+                    source: a["source"]["name"]
+                        .as_str()
+                        .unwrap_or("unknown")
+                        .to_string(),
                     published_at: a["publishedAt"]
                         .as_str()
                         .and_then(|s| s.parse().ok())
