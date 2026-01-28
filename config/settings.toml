@@ -1,0 +1,23 @@
+[schwab]
+redirect_uri = "http://localhost:8080/callback"
+
+[anthropic]
+model = "claude-sonnet-4-20250514"
+max_tokens = 1024
+
+[trading]
+max_position_size_dollars = 100
+max_position_pct = 20
+max_daily_trades = 10
+max_daily_loss_dollars = 50
+day_trade_limit = 3
+blocked_tickers = ["GME", "AMC", "BBBY"]
+dry_run = true
+
+state_path = "data/state.json"
+
+[logging]
+audit_path = "logs/audit.jsonl"
+
+[data_sources]
+quote_interval_secs = 60
