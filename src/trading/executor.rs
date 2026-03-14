@@ -11,16 +11,11 @@ use std::sync::Arc;
 pub struct TradeExecutor {
     schwab: Arc<SchwabClient>,
     pub rules: TradingRules,
-    account_id: String,
 }
 
 impl TradeExecutor {
-    pub fn new(schwab: Arc<SchwabClient>, rules: TradingRules, account_id: String) -> Self {
-        Self {
-            schwab,
-            rules,
-            account_id,
-        }
+    pub fn new(schwab: Arc<SchwabClient>, rules: TradingRules) -> Self {
+        Self { schwab, rules }
     }
 
     pub async fn execute(
@@ -92,7 +87,7 @@ impl TradeExecutor {
         };
 
         // Submit order
-        let response = self.schwab.place_order(&self.account_id, &order).await?;
+        let response = self.schwab.place_order(&order).await?;
 
         // Record trade
         self.rules.record_trade(TradeRecord {

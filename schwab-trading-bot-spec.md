@@ -112,7 +112,7 @@ pub struct Settings {
 pub struct SchwabConfig {
     pub client_id: SecretString,
     pub client_secret: SecretString,
-    pub redirect_uri: String,      // Usually http://localhost:8080/callback
+    pub redirect_uri: String,      // Usually https://127.0.0.1:8080
     pub account_id: String,
 }
 
@@ -940,10 +940,6 @@ impl AuditLogger {
 ### settings.toml
 
 ```toml
-[schwab]
-redirect_uri = "http://localhost:8080/callback"
-# account_id loaded from env
-
 [anthropic]
 model = "claude-sonnet-4-20250514"
 max_tokens = 1024

@@ -135,8 +135,7 @@ async fn run_trade_session(mode: TradingMode, force_dry_run: bool) -> anyhow::Re
         rules.set_dry_run(true);
     }
 
-    let mut executor =
-        TradeExecutor::new(schwab.clone(), rules, settings.schwab.account_id.clone());
+    let mut executor = TradeExecutor::new(schwab.clone(), rules);
 
     let watchlist: Vec<&str> = vec!["AAPL", "GOOGL", "MSFT", "AMZN", "NVDA", "SPY", "QQQ"];
 
@@ -168,7 +167,7 @@ async fn run_trade_session(mode: TradingMode, force_dry_run: bool) -> anyhow::Re
         InputSanitizer::structure_market_context(&quotes, &historical, &sentiment, &sanitized_news);
 
     // Build portfolio
-    let portfolio = build_portfolio(&schwab, &settings.schwab.account_id).await?;
+    let portfolio = build_portfolio(&schwab).await?;
 
     // Build constraints
     let constraints = executor.rules.get_current_constraints(&portfolio);
@@ -281,7 +280,7 @@ async fn show_status() -> anyhow::Result<()> {
         return Err(e.into());
     }
 
-    let portfolio = build_portfolio(&schwab, &settings.schwab.account_id).await?;
+    let portfolio = build_portfolio(&schwab).await?;
 
     println!("=== Portfolio Status ===");
     println!("Cash Available: ${}", portfolio.cash_available);
@@ -356,20 +355,17 @@ async fn show_history(days: u32) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn build_portfolio(
-    schwab: &SchwabClient,
-    account_id: &str,
-) -> schwab_bot::error::Result<Portfolio> {
-    let account = schwab.get_account(account_id).await?;
-    let positions = schwab.get_positions(account_id).await?;
+async fn build_portfolio(schwab: &SchwabClient) -> schwab_bot::error::Result<Portfolio> {
+    let account = schwab.get_account().await?;
+    let positions = schwab.get_positions().await?;
 
-    let balances =
-        account
-            .current_balances
-            .unwrap_or(schwab_bot::schwab::models::AccountBalances {
-                cash_available_for_trading: rust_decimal::Decimal::ZERO,
-                liquidation_value: rust_decimal::Decimal::ZERO,
-            });
+    let balances = account
+        .securities_account
+        .and_then(|sa| sa.current_balances)
+        .unwrap_or(schwab_bot::schwab::models::AccountBalances {
+            cash_available_for_trading: rust_decimal::Decimal::ZERO,
+            liquidation_value: rust_decimal::Decimal::ZERO,
+        });
 
     Ok(Portfolio {
         cash_available: balances.cash_available_for_trading,

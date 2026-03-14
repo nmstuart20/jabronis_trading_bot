@@ -25,8 +25,8 @@ pub struct TokenManager {
 impl TokenManager {
     pub async fn new(config: &SchwabConfig) -> Result<Self> {
         let manager = Self {
-            client_id: config.client_id.clone(),
-            client_secret: config.client_secret.clone(),
+            client_id: config.app_key.clone(),
+            client_secret: config.app_secret.clone(),
             redirect_uri: config.redirect_uri.clone(),
             http: reqwest::Client::new(),
             token_data: Arc::new(RwLock::new(None)),

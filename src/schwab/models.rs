@@ -29,10 +29,25 @@ pub struct Position {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct AccountNumberHash {
+    pub account_number: String,
+    pub hash_value: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Account {
-    pub account_id: String,
+    pub securities_account: Option<SecuritiesAccount>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SecuritiesAccount {
+    pub account_number: Option<String>,
     #[serde(default)]
     pub current_balances: Option<AccountBalances>,
+    #[serde(default)]
+    pub positions: Vec<Position>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

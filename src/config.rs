@@ -39,10 +39,9 @@ impl Default for LoggingConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct SchwabConfig {
-    pub client_id: SecretString,
-    pub client_secret: SecretString,
+    pub app_key: SecretString,
+    pub app_secret: SecretString,
     pub redirect_uri: String,
-    pub account_id: String,
 }
 
 #[derive(Debug, Deserialize)]

@@ -4,6 +4,7 @@ use crate::schwab::auth::TokenManager;
 use crate::schwab::models::*;
 use secrecy::ExposeSecret;
 use std::collections::HashMap;
+use tokio::sync::OnceCell;
 
 const BASE_URL: &str = "https://api.schwabapi.com/trader/v1";
 
@@ -11,6 +12,7 @@ pub struct SchwabClient {
     http: reqwest::Client,
     token_manager: TokenManager,
     base_url: String,
+    account_hash: OnceCell<String>,
 }
 
 impl SchwabClient {
@@ -20,6 +22,7 @@ impl SchwabClient {
             http: reqwest::Client::new(),
             token_manager,
             base_url: BASE_URL.to_string(),
+            account_hash: OnceCell::new(),
         })
     }
 
@@ -45,11 +48,13 @@ impl SchwabClient {
         }
     }
 
-    pub async fn get_accounts(&self) -> Result<Vec<Account>> {
+    /// Fetches linked account numbers and their encrypted hash values.
+    /// The hash value is required for all account-specific API calls.
+    pub async fn get_account_numbers(&self) -> Result<Vec<AccountNumberHash>> {
         let auth = self.auth_header().await?;
         let resp = self
             .http
-            .get(format!("{}/accounts", self.base_url))
+            .get(format!("{}/accounts/accountNumbers", self.base_url))
             .header("Authorization", &auth)
             .send()
             .await?;
@@ -57,11 +62,41 @@ impl SchwabClient {
         Ok(resp.json().await?)
     }
 
-    pub async fn get_account(&self, account_id: &str) -> Result<Account> {
+    /// Returns the encrypted account hash for the first linked account.
+    /// Fetches and caches it on first call.
+    pub async fn get_account_hash(&self) -> Result<&str> {
+        self.account_hash
+            .get_or_try_init(|| async {
+                let accounts = self.get_account_numbers().await?;
+                let first = accounts
+                    .into_iter()
+                    .next()
+                    .ok_or_else(|| BotError::Other("No linked accounts found".into()))?;
+                Ok(first.hash_value)
+            })
+            .await
+            .map(|s| s.as_str())
+    }
+
+    pub async fn get_accounts(&self) -> Result<Vec<Account>> {
         let auth = self.auth_header().await?;
         let resp = self
             .http
-            .get(format!("{}/accounts/{}", self.base_url, account_id))
+            .get(format!("{}/accounts", self.base_url))
+            .header("Authorization", &auth)
+            .query(&[("fields", "positions")])
+            .send()
+            .await?;
+        let resp = self.check_response(resp).await?;
+        Ok(resp.json().await?)
+    }
+
+    pub async fn get_account(&self) -> Result<Account> {
+        let account_hash = self.get_account_hash().await?;
+        let auth = self.auth_header().await?;
+        let resp = self
+            .http
+            .get(format!("{}/accounts/{}", self.base_url, account_hash))
             .header("Authorization", &auth)
             .query(&[("fields", "positions")])
             .send()
@@ -149,11 +184,15 @@ impl SchwabClient {
         Ok(resp.json().await?)
     }
 
-    pub async fn place_order(&self, account_id: &str, order: &Order) -> Result<OrderResponse> {
+    pub async fn place_order(&self, order: &Order) -> Result<OrderResponse> {
+        let account_hash = self.get_account_hash().await?;
         let auth = self.auth_header().await?;
         let resp = self
             .http
-            .post(format!("{}/accounts/{}/orders", self.base_url, account_id))
+            .post(format!(
+                "{}/accounts/{}/orders",
+                self.base_url, account_hash
+            ))
             .header("Authorization", &auth)
             .json(order)
             .send()
@@ -170,11 +209,15 @@ impl SchwabClient {
         Ok(OrderResponse { order_id })
     }
 
-    pub async fn get_orders(&self, account_id: &str) -> Result<Vec<Order>> {
+    pub async fn get_orders(&self) -> Result<Vec<Order>> {
+        let account_hash = self.get_account_hash().await?;
         let auth = self.auth_header().await?;
         let resp = self
             .http
-            .get(format!("{}/accounts/{}/orders", self.base_url, account_id))
+            .get(format!(
+                "{}/accounts/{}/orders",
+                self.base_url, account_hash
+            ))
             .header("Authorization", &auth)
             .send()
             .await?;
@@ -182,13 +225,14 @@ impl SchwabClient {
         Ok(resp.json().await?)
     }
 
-    pub async fn cancel_order(&self, account_id: &str, order_id: &str) -> Result<()> {
+    pub async fn cancel_order(&self, order_id: &str) -> Result<()> {
+        let account_hash = self.get_account_hash().await?;
         let auth = self.auth_header().await?;
         let resp = self
             .http
             .delete(format!(
                 "{}/accounts/{}/orders/{}",
-                self.base_url, account_id, order_id
+                self.base_url, account_hash, order_id
             ))
             .header("Authorization", &auth)
             .send()
@@ -197,11 +241,12 @@ impl SchwabClient {
         Ok(())
     }
 
-    pub async fn get_positions(&self, account_id: &str) -> Result<Vec<Position>> {
-        let account = self.get_account(account_id).await?;
-        // Positions come from account data - for now return empty
-        // The actual Schwab API returns positions nested in the account response
-        let _ = account;
-        Ok(vec![])
+    pub async fn get_positions(&self) -> Result<Vec<Position>> {
+        let account = self.get_account().await?;
+        let positions = account
+            .securities_account
+            .map(|sa| sa.positions)
+            .unwrap_or_default();
+        Ok(positions)
     }
 }
