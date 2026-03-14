@@ -1029,3 +1029,74 @@ mod state_persistence {
         assert_eq!(loaded.trade_history[0].ticker, "NEW");
     }
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// News API Integration Tests (requires NEWS_API_KEY env var)
+// ══════════════════════════════════════════════════════════════════════════════
+
+mod news_integration {
+    use schwab_bot::config::DataSourcesConfig;
+    use schwab_bot::data::news::NewsService;
+    use secrecy::SecretString;
+
+    /// Integration test that fetches real news from the NewsAPI.
+    ///
+    /// Run with: cargo test news_integration::fetch_news -- --ignored --nocapture
+    ///
+    /// Requires:
+    ///   - NEWS_API_KEY env var (get one at https://newsapi.org)
+    #[tokio::test]
+    #[ignore]
+    async fn fetch_news() {
+        dotenvy::dotenv().ok();
+
+        let api_key = std::env::var("NEWS_API_KEY")
+            .expect("NEWS_API_KEY env var required");
+
+        let config = DataSourcesConfig {
+            news_api_key: Some(SecretString::from(api_key)),
+            sentiment_api_key: None,
+            quote_interval_secs: 10,
+        };
+
+        let service = NewsService::new(&config);
+        let articles = service
+            .get_news(&["AAPL", "MSFT"], 5)
+            .await
+            .expect("Failed to fetch news");
+
+        assert!(!articles.is_empty(), "Expected at least one news article");
+
+        println!("\n=== News Articles ({}) ===", articles.len());
+        for article in &articles {
+            println!("  [{}] {} - {}", article.source, article.headline, article.published_at);
+            if !article.summary.is_empty() {
+                println!("    {}", &article.summary[..article.summary.len().min(100)]);
+            }
+        }
+
+        // Verify article fields are populated
+        let first = &articles[0];
+        assert!(!first.headline.is_empty(), "Headline should not be empty");
+        assert!(!first.source.is_empty(), "Source should not be empty");
+        assert_eq!(first.symbols, vec!["AAPL", "MSFT"]);
+    }
+
+    /// Verifies that missing API key returns empty results (no error).
+    #[tokio::test]
+    async fn no_api_key_returns_empty() {
+        let config = DataSourcesConfig {
+            news_api_key: None,
+            sentiment_api_key: None,
+            quote_interval_secs: 10,
+        };
+
+        let service = NewsService::new(&config);
+        let articles = service
+            .get_news(&["AAPL"], 5)
+            .await
+            .expect("Should not error without API key");
+
+        assert!(articles.is_empty(), "Should return empty vec without API key");
+    }
+}

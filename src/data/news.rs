@@ -20,7 +20,10 @@ pub struct NewsService {
 impl NewsService {
     pub fn new(config: &DataSourcesConfig) -> Self {
         Self {
-            http: reqwest::Client::new(),
+            http: reqwest::Client::builder()
+                .user_agent("schwab-bot/0.1")
+                .build()
+                .expect("Failed to build HTTP client"),
             api_key: config
                 .news_api_key
                 .as_ref()
