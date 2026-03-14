@@ -25,6 +25,8 @@ open = "5"
 axum = "0.7"
 base64 = "0.22"
 clap = { version = "4", features = ["derive"] }
+rcgen = "0.14.7"
+axum-server = { version = "0.8.0", features = ["tls-rustls"] }
 
 [dev-dependencies]
 wiremock = "0.6"

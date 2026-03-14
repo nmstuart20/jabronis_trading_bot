@@ -108,14 +108,31 @@ impl TokenManager {
             url::form_urlencoded::byte_serialize(self.redirect_uri.as_bytes()).collect::<String>(),
         );
 
-        tracing::info!("Opening browser for authentication...");
-        let _ = open::that(&auth_url);
+        // Parse host and port from redirect_uri
+        let parsed_uri = url::Url::parse(&self.redirect_uri)
+            .map_err(|e| BotError::OAuth(format!("Invalid redirect_uri: {e}")))?;
+        let host = parsed_uri.host_str().expect("redirect_uri not set");
+        let port = parsed_uri.port().unwrap_or(443);
+        let bind_addr: std::net::SocketAddr = format!("{host}:{port}")
+            .parse()
+            .map_err(|e| BotError::Other(format!("Invalid bind address: {e}")))?;
+
+        // Generate a self-signed TLS certificate for the callback server
+        let cert = rcgen::generate_simple_self_signed(vec![host.to_string()])
+            .map_err(|e| BotError::Other(format!("Failed to generate TLS cert: {e}")))?;
+        let tls_config = axum_server::tls_rustls::RustlsConfig::from_pem(
+            cert.cert.pem().into_bytes(),
+            cert.signing_key.serialize_pem().into_bytes(),
+        )
+        .await
+        .map_err(|e| BotError::Other(format!("Failed to configure TLS: {e}")))?;
 
         let (tx, rx) = tokio::sync::oneshot::channel::<String>();
         let tx = Arc::new(tokio::sync::Mutex::new(Some(tx)));
 
+        let callback_path = parsed_uri.path().to_string();
         let app = axum::Router::new().route(
-            "/callback",
+            &callback_path,
             axum::routing::get({
                 let tx = tx.clone();
                 move |params: axum::extract::Query<std::collections::HashMap<String, String>>| {
@@ -132,17 +149,30 @@ impl TokenManager {
             }),
         );
 
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:8080")
-            .await
-            .map_err(|e| BotError::Other(format!("Failed to bind callback server: {e}")))?;
+        tracing::info!("Starting HTTPS callback server on {bind_addr}");
+        println!("Starting HTTPS callback server on {bind_addr}...");
+
+        let handle = axum_server::Handle::new();
+        let shutdown_handle = handle.clone();
 
         tokio::spawn(async move {
-            axum::serve(listener, app).await.ok();
+            axum_server::bind_rustls(bind_addr, tls_config)
+                .handle(handle)
+                .serve(app.into_make_service())
+                .await
+                .ok();
         });
+
+        println!("Opening browser for Schwab login...");
+        println!("If it doesn't open, visit this URL:\n{auth_url}\n");
+        let _ = open::that(&auth_url);
 
         let code = rx
             .await
             .map_err(|_| BotError::OAuth("Failed to receive auth code".into()))?;
+
+        // Shut down the callback server
+        shutdown_handle.shutdown();
 
         self.exchange_code(&code).await
     }

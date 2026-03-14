@@ -107,11 +107,13 @@ impl SchwabClient {
 
     pub async fn get_quote(&self, symbol: &str) -> Result<Quote> {
         let auth = self.auth_header().await?;
+        let encoded_symbol =
+            url::form_urlencoded::byte_serialize(symbol.as_bytes()).collect::<String>();
         let resp = self
             .http
             .get(format!(
                 "https://api.schwabapi.com/marketdata/v1/{}/quotes",
-                symbol
+                encoded_symbol
             ))
             .header("Authorization", &auth)
             .send()
@@ -194,6 +196,7 @@ impl SchwabClient {
                 self.base_url, account_hash
             ))
             .header("Authorization", &auth)
+            .header("Accept", "application/json")
             .json(order)
             .send()
             .await?;
@@ -209,7 +212,11 @@ impl SchwabClient {
         Ok(OrderResponse { order_id })
     }
 
-    pub async fn get_orders(&self) -> Result<Vec<Order>> {
+    pub async fn get_orders(
+        &self,
+        from_entered_time: &str,
+        to_entered_time: &str,
+    ) -> Result<Vec<Order>> {
         let account_hash = self.get_account_hash().await?;
         let auth = self.auth_header().await?;
         let resp = self
@@ -219,6 +226,10 @@ impl SchwabClient {
                 self.base_url, account_hash
             ))
             .header("Authorization", &auth)
+            .query(&[
+                ("fromEnteredTime", from_entered_time),
+                ("toEnteredTime", to_entered_time),
+            ])
             .send()
             .await?;
         let resp = self.check_response(resp).await?;
@@ -245,7 +256,7 @@ impl SchwabClient {
         let account = self.get_account().await?;
         let positions = account
             .securities_account
-            .map(|sa| sa.positions)
+            .map(|sa| sa.positions.into_iter().map(|p| p.into_position()).collect())
             .unwrap_or_default();
         Ok(positions)
     }

@@ -112,7 +112,7 @@ pub struct Settings {
 pub struct SchwabConfig {
     pub client_id: SecretString,
     pub client_secret: SecretString,
-    pub redirect_uri: String,      // Usually https://127.0.0.1:8080
+    pub redirect_uri: String,     
     pub account_id: String,
 }
 

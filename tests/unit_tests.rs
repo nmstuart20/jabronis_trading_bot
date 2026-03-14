@@ -825,6 +825,114 @@ mod model_serde {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Schwab API Integration Tests (requires real credentials + browser auth)
+// ══════════════════════════════════════════════════════════════════════════════
+
+mod schwab_integration {
+    use schwab_bot::config::SchwabConfig;
+    use schwab_bot::schwab::client::SchwabClient;
+    use secrecy::SecretString;
+
+    /// Integration test that authenticates with Schwab and fetches account holdings.
+    ///
+    /// Run with: cargo test schwab_integration::get_holdings -- --ignored --nocapture
+    ///
+    /// Requires:
+    ///   - SCHWAB_APP_KEY and SCHWAB_APP_SECRET env vars
+    ///   - SCHWAB_REDIRECT_URI env var
+    ///   - A browser to complete the OAuth flow
+    #[tokio::test]
+    #[ignore]
+    async fn get_holdings() {
+        dotenvy::dotenv().ok();
+
+        let app_key = std::env::var("SCHWAB_APP_KEY")
+            .expect("SCHWAB_APP_KEY env var required");
+        let app_secret = std::env::var("SCHWAB_APP_SECRET")
+            .expect("SCHWAB_APP_SECRET env var required");
+        let redirect_uri = std::env::var("SCHWAB_REDIRECT_URI")
+            .expect("SCHWAB_REDIRECT_URI env var required");
+
+        let config = SchwabConfig {
+            app_key: SecretString::from(app_key),
+            app_secret: SecretString::from(app_secret),
+            redirect_uri,
+        };
+
+        let client = SchwabClient::new(&config)
+            .await
+            .expect("Failed to create client");
+
+        // This opens a browser for OAuth — complete the login there
+        client
+            .ensure_authenticated()
+            .await
+            .expect("Authentication failed");
+
+        // Fetch linked account numbers
+        let account_numbers = client
+            .get_account_numbers()
+            .await
+            .expect("Failed to get account numbers");
+        assert!(!account_numbers.is_empty(), "No linked accounts found");
+        println!("\n=== Linked Accounts ===");
+        for acct in &account_numbers {
+            println!(
+                "  Account: {} (hash: {}...)",
+                acct.account_number,
+                &acct.hash_value[..8.min(acct.hash_value.len())]
+            );
+        }
+
+        // Fetch account details with positions
+        let account = client
+            .get_account()
+            .await
+            .expect("Failed to get account details");
+        let securities = account
+            .securities_account
+            .expect("No securities account in response");
+
+        if let Some(balances) = &securities.current_balances {
+            println!("\n=== Balances ===");
+            println!("  Cash Available: ${}", balances.cash_available_for_trading);
+            println!("  Liquidation Value: ${}", balances.liquidation_value);
+        }
+
+        // Fetch positions via the client helper (tests SchwabPosition -> Position conversion)
+        let positions = client
+            .get_positions()
+            .await
+            .expect("Failed to get positions");
+
+        println!("\n=== Positions ({}) ===", positions.len());
+        if positions.is_empty() {
+            println!("  No open positions.");
+        } else {
+            println!(
+                "  {:<8} {:>10} {:>12} {:>12} {:>10}",
+                "Symbol", "Qty", "Avg Price", "Value", "Day P&L"
+            );
+            println!("  {}", "-".repeat(56));
+            for p in &positions {
+                println!(
+                    "  {:<8} {:>10} {:>12} {:>12} {:>10}",
+                    p.symbol, p.quantity, p.average_price, p.current_value, p.unrealized_pnl
+                );
+            }
+        }
+
+        // Basic sanity: the API returned valid data
+        if let Some(balances) = &securities.current_balances {
+            assert!(
+                balances.liquidation_value >= rust_decimal::Decimal::ZERO,
+                "Liquidation value should be non-negative"
+            );
+        }
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // State Persistence Tests
 // ══════════════════════════════════════════════════════════════════════════════
 

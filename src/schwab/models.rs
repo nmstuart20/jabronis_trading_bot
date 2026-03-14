@@ -17,6 +17,7 @@ pub struct Quote {
     pub quote_time: i64,
 }
 
+/// Internal position representation used throughout the bot.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Position {
@@ -25,6 +26,36 @@ pub struct Position {
     pub average_price: Decimal,
     pub current_value: Decimal,
     pub unrealized_pnl: Decimal,
+}
+
+/// Raw position as returned by the Schwab API, nested inside securitiesAccount.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SchwabPosition {
+    pub instrument: Instrument,
+    #[serde(default)]
+    pub long_quantity: Decimal,
+    #[serde(default)]
+    pub short_quantity: Decimal,
+    #[serde(default)]
+    pub average_price: Decimal,
+    #[serde(default)]
+    pub market_value: Decimal,
+    #[serde(default)]
+    pub current_day_profit_loss: Decimal,
+}
+
+impl SchwabPosition {
+    pub fn into_position(self) -> Position {
+        let quantity = self.long_quantity - self.short_quantity;
+        Position {
+            symbol: self.instrument.symbol,
+            quantity,
+            average_price: self.average_price,
+            current_value: self.market_value,
+            unrealized_pnl: self.current_day_profit_loss,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -47,7 +78,7 @@ pub struct SecuritiesAccount {
     #[serde(default)]
     pub current_balances: Option<AccountBalances>,
     #[serde(default)]
-    pub positions: Vec<Position>,
+    pub positions: Vec<SchwabPosition>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -134,6 +165,13 @@ pub enum AssetType {
     Option,
     MutualFund,
     Etf,
+    Index,
+    CashEquivalent,
+    FixedIncome,
+    Currency,
+    CollectiveInvestment,
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Debug, Clone, Deserialize)]
