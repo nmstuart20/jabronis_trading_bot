@@ -1,17 +1,40 @@
 use crate::config::SchwabConfig;
 use crate::error::{BotError, Result};
 use secrecy::{ExposeSecret, SecretString};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 const AUTH_URL: &str = "https://api.schwabapi.com/v1/oauth/authorize";
 const TOKEN_URL: &str = "https://api.schwabapi.com/v1/oauth/token";
 
+/// Access tokens last 30 minutes.
+const ACCESS_TOKEN_LIFETIME_SECS: i64 = 1800;
+/// Refresh tokens last 7 days.
+const REFRESH_TOKEN_LIFETIME_SECS: i64 = 7 * 24 * 3600;
+
 #[derive(Debug, Clone)]
 struct TokenData {
     access_token: SecretString,
     refresh_token: SecretString,
-    expires_at: chrono::DateTime<chrono::Utc>,
+    access_token_issued: chrono::DateTime<chrono::Utc>,
+    refresh_token_issued: chrono::DateTime<chrono::Utc>,
+}
+
+/// On-disk representation of stored tokens.
+#[derive(serde::Serialize, serde::Deserialize)]
+struct StoredTokens {
+    access_token: String,
+    refresh_token: String,
+    access_token_issued: chrono::DateTime<chrono::Utc>,
+    refresh_token_issued: chrono::DateTime<chrono::Utc>,
+}
+
+fn default_token_path() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".schwab_bot")
+        .join("tokens.json")
 }
 
 pub struct TokenManager {
@@ -20,6 +43,7 @@ pub struct TokenManager {
     redirect_uri: String,
     http: reqwest::Client,
     token_data: Arc<RwLock<Option<TokenData>>>,
+    token_path: PathBuf,
 }
 
 impl TokenManager {
@@ -30,7 +54,14 @@ impl TokenManager {
             redirect_uri: config.redirect_uri.clone(),
             http: reqwest::Client::new(),
             token_data: Arc::new(RwLock::new(None)),
+            token_path: default_token_path(),
         };
+
+        // Try to load persisted tokens
+        if let Err(e) = manager.load_tokens().await {
+            tracing::debug!("No stored tokens found: {e}");
+        }
+
         Ok(manager)
     }
 
@@ -43,22 +74,47 @@ impl TokenManager {
         }
     }
 
+    /// Check if tokens need refreshing and handle it.
+    /// - If no tokens exist, return TokenExpired (caller should initiate auth flow).
+    /// - If access token is expiring soon, refresh it.
+    /// - If refresh token is expiring soon, require full re-auth.
     pub async fn refresh_if_needed(&self) -> Result<()> {
-        let needs_refresh = {
+        let state = {
             let data = self.token_data.read().await;
             match &*data {
                 None => return Err(BotError::TokenExpired),
-                Some(td) => chrono::Utc::now() >= td.expires_at - chrono::Duration::minutes(5),
+                Some(td) => {
+                    let now = chrono::Utc::now();
+                    let access_age = (now - td.access_token_issued).num_seconds();
+                    let refresh_age = (now - td.refresh_token_issued).num_seconds();
+
+                    if refresh_age >= REFRESH_TOKEN_LIFETIME_SECS - 60 {
+                        TokenState::RefreshExpired
+                    } else if access_age >= ACCESS_TOKEN_LIFETIME_SECS - 60 {
+                        TokenState::AccessExpired
+                    } else {
+                        TokenState::Valid
+                    }
+                }
             }
         };
 
-        if needs_refresh {
-            self.refresh_token().await?;
+        match state {
+            TokenState::Valid => Ok(()),
+            TokenState::AccessExpired => {
+                tracing::info!("Access token expiring, refreshing...");
+                self.do_refresh_token().await
+            }
+            TokenState::RefreshExpired => {
+                tracing::warn!("Refresh token expired, re-authentication required");
+                // Clear stale tokens
+                *self.token_data.write().await = None;
+                Err(BotError::TokenExpired)
+            }
         }
-        Ok(())
     }
 
-    async fn refresh_token(&self) -> Result<()> {
+    async fn do_refresh_token(&self) -> Result<()> {
         let refresh_tok = {
             let data = self.token_data.read().await;
             match &*data {
@@ -101,6 +157,24 @@ impl TokenManager {
     }
 
     pub async fn initiate_auth_flow(&self) -> Result<()> {
+        // If we already have valid tokens, just refresh if needed
+        {
+            let data = self.token_data.read().await;
+            if data.is_some() {
+                drop(data);
+                match self.refresh_if_needed().await {
+                    Ok(()) => {
+                        tracing::info!("Using stored tokens (refreshed if needed)");
+                        return Ok(());
+                    }
+                    Err(BotError::TokenExpired) => {
+                        tracing::info!("Stored tokens expired, starting fresh auth flow");
+                    }
+                    Err(e) => return Err(e),
+                }
+            }
+        }
+
         let auth_url = format!(
             "{}?response_type=code&client_id={}&redirect_uri={}",
             AUTH_URL,
@@ -219,18 +293,107 @@ impl TokenManager {
         let refresh_token = resp["refresh_token"]
             .as_str()
             .ok_or_else(|| BotError::OAuth("Missing refresh_token".into()))?;
-        let expires_in = resp["expires_in"]
-            .as_i64()
-            .ok_or_else(|| BotError::OAuth("Missing expires_in".into()))?;
+
+        let now = chrono::Utc::now();
+
+        // Preserve the original refresh_token_issued if we're just refreshing the access token
+        // (the refresh token doesn't change on access token refresh)
+        let refresh_token_issued = {
+            let data = self.token_data.read().await;
+            if let Some(td) = &*data {
+                // If the refresh token is the same, keep the original issue time
+                if td.refresh_token.expose_secret() == refresh_token {
+                    td.refresh_token_issued
+                } else {
+                    now
+                }
+            } else {
+                now
+            }
+        };
 
         let token_data = TokenData {
             access_token: SecretString::from(access_token.to_string()),
             refresh_token: SecretString::from(refresh_token.to_string()),
-            expires_at: chrono::Utc::now() + chrono::Duration::seconds(expires_in),
+            access_token_issued: now,
+            refresh_token_issued,
         };
+
+        // Persist to disk
+        self.save_tokens(&token_data)?;
 
         let mut data = self.token_data.write().await;
         *data = Some(token_data);
         Ok(())
     }
+
+    fn save_tokens(&self, td: &TokenData) -> Result<()> {
+        let stored = StoredTokens {
+            access_token: td.access_token.expose_secret().to_string(),
+            refresh_token: td.refresh_token.expose_secret().to_string(),
+            access_token_issued: td.access_token_issued,
+            refresh_token_issued: td.refresh_token_issued,
+        };
+
+        if let Some(parent) = self.token_path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| BotError::Other(format!("Failed to create token dir: {e}")))?;
+        }
+
+        let json = serde_json::to_string_pretty(&stored)?;
+        std::fs::write(&self.token_path, json)
+            .map_err(|e| BotError::Other(format!("Failed to write tokens: {e}")))?;
+
+        // Restrict file permissions to owner-only (unix)
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let perms = std::fs::Permissions::from_mode(0o600);
+            let _ = std::fs::set_permissions(&self.token_path, perms);
+        }
+
+        tracing::info!("Tokens saved to {}", self.token_path.display());
+        Ok(())
+    }
+
+    async fn load_tokens(&self) -> Result<()> {
+        let json = std::fs::read_to_string(&self.token_path)
+            .map_err(|e| BotError::Other(format!("Failed to read tokens: {e}")))?;
+        let stored: StoredTokens = serde_json::from_str(&json)?;
+
+        // Check if refresh token is still valid
+        let refresh_age =
+            (chrono::Utc::now() - stored.refresh_token_issued).num_seconds();
+        if refresh_age >= REFRESH_TOKEN_LIFETIME_SECS {
+            tracing::info!("Stored refresh token has expired, need fresh auth");
+            return Err(BotError::TokenExpired);
+        }
+
+        let token_data = TokenData {
+            access_token: SecretString::from(stored.access_token),
+            refresh_token: SecretString::from(stored.refresh_token),
+            access_token_issued: stored.access_token_issued,
+            refresh_token_issued: stored.refresh_token_issued,
+        };
+
+        let access_remaining =
+            ACCESS_TOKEN_LIFETIME_SECS - (chrono::Utc::now() - token_data.access_token_issued).num_seconds();
+        let refresh_remaining =
+            REFRESH_TOKEN_LIFETIME_SECS - (chrono::Utc::now() - token_data.refresh_token_issued).num_seconds();
+        tracing::info!(
+            "Loaded stored tokens (access expires in {}s, refresh expires in {}s)",
+            access_remaining,
+            refresh_remaining
+        );
+
+        let mut data = self.token_data.write().await;
+        *data = Some(token_data);
+        Ok(())
+    }
+}
+
+enum TokenState {
+    Valid,
+    AccessExpired,
+    RefreshExpired,
 }
