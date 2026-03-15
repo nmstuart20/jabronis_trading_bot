@@ -18,7 +18,7 @@ watchlist = [
     # Semiconductors
     "AMD", "MRVL", "AVGO", "SMCI", "ARM",
     # Growth / high-beta
-    "PLTR", "NET", "DDOG", "CRWD", "SNOW",
+    "NET", "DDOG", "CRWD", "SNOW",
     # Small / mid-cap high-upside
     "IONQ", "RGTI", "RKLB", "LUNR", "AEHR",
     "SOUN", "BBAI", "JOBY", "ACHR", "ASTS",
