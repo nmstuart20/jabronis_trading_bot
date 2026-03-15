@@ -63,10 +63,21 @@ pub struct TradingConfig {
     pub blocked_tickers: Vec<String>,
     #[serde(default = "default_dry_run")]
     pub dry_run: bool,
+    #[serde(default = "default_watchlist")]
+    pub watchlist: Vec<String>,
 }
 
 fn default_dry_run() -> bool {
     true
+}
+
+fn default_watchlist() -> Vec<String> {
+    vec![
+        "AAPL", "GOOGL", "MSFT", "AMZN", "NVDA", "SPY", "QQQ",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect()
 }
 
 #[derive(Debug, Deserialize)]
@@ -82,7 +93,7 @@ impl Settings {
             .add_source(config::File::with_name("config/settings").required(false))
             .add_source(
                 config::Environment::default()
-                    .separator("_")
+                    .separator("__")
                     .try_parsing(true),
             )
             .build()?;

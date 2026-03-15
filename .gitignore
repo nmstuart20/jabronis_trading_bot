@@ -2,3 +2,4 @@
 *.env
 *.env.example
 /.schwab_bot
+data/state.json

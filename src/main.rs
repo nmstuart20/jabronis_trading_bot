@@ -137,7 +137,7 @@ async fn run_trade_session(mode: TradingMode, force_dry_run: bool) -> anyhow::Re
 
     let mut executor = TradeExecutor::new(schwab.clone(), rules);
 
-    let watchlist: Vec<&str> = vec!["AAPL", "GOOGL", "MSFT", "AMZN", "NVDA", "SPY", "QQQ"];
+    let watchlist: Vec<&str> = settings.trading.watchlist.iter().map(|s| s.as_str()).collect();
 
     let dry_run_active = force_dry_run || settings.trading.dry_run;
     println!(
@@ -175,12 +175,12 @@ async fn run_trade_session(mode: TradingMode, force_dry_run: bool) -> anyhow::Re
     // Get LLM decision
     let prompt =
         PromptBuilder::build_trading_prompt(&context, &portfolio, &constraints, mode.as_str());
-
+    
     let _ = audit
         .log(AuditEntry {
             timestamp: chrono::Utc::now(),
             event_type: AuditEventType::LlmRequest,
-            details: serde_json::json!({"prompt_length": prompt.len(), "mode": mode.as_str()}),
+            details: serde_json::json!({"prompt": &prompt, "prompt_length": prompt.len(), "mode": mode.as_str()}),
         })
         .await;
 
@@ -203,7 +203,7 @@ async fn run_trade_session(mode: TradingMode, force_dry_run: bool) -> anyhow::Re
         .log(AuditEntry {
             timestamp: chrono::Utc::now(),
             event_type: AuditEventType::LlmResponse,
-            details: serde_json::json!({"response_length": response.len()}),
+            details: serde_json::json!({"response": &response, "response_length": response.len()}),
         })
         .await;
 

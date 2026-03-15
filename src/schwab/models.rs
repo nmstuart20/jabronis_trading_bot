@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Quote {
+    #[serde(default)]
     pub symbol: String,
     pub bid_price: Decimal,
     pub ask_price: Decimal,

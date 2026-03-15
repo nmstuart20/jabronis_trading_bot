@@ -123,7 +123,10 @@ impl SchwabClient {
         let quote_val = data
             .get(symbol)
             .ok_or_else(|| BotError::Other(format!("No quote for {symbol}")))?;
-        let quote: Quote = serde_json::from_value(quote_val["quote"].clone())?;
+        let mut quote: Quote = serde_json::from_value(quote_val["quote"].clone())?;
+        if quote.symbol.is_empty() {
+            quote.symbol = symbol.to_string();
+        }
         Ok(quote)
     }
 
@@ -141,7 +144,10 @@ impl SchwabClient {
         let data: HashMap<String, serde_json::Value> = resp.json().await?;
         let mut quotes = HashMap::new();
         for (sym, val) in &data {
-            if let Ok(q) = serde_json::from_value::<Quote>(val["quote"].clone()) {
+            if let Ok(mut q) = serde_json::from_value::<Quote>(val["quote"].clone()) {
+                if q.symbol.is_empty() {
+                    q.symbol = sym.clone();
+                }
                 quotes.insert(sym.clone(), q);
             }
         }

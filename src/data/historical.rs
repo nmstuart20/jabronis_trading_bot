@@ -13,10 +13,10 @@ impl HistoricalDataService {
         Self { schwab }
     }
 
-    pub async fn get_daily_bars(&self, symbol: &str, days: u32) -> Result<Vec<Candle>> {
+    pub async fn get_daily_bars(&self, symbol: &str) -> Result<Vec<Candle>> {
         let history = self
             .schwab
-            .get_price_history(symbol, PeriodType::Day, days, FrequencyType::Daily, 1)
+            .get_price_history(symbol, PeriodType::Month, 1, FrequencyType::Daily, 1)
             .await?;
         Ok(history.candles)
     }
@@ -32,7 +32,7 @@ impl HistoricalDataService {
     pub async fn get_recent_bars(&self, symbols: &[&str]) -> Result<HashMap<String, Vec<Candle>>> {
         let mut result = HashMap::new();
         for &sym in symbols {
-            match self.get_daily_bars(sym, 10).await {
+            match self.get_daily_bars(sym).await {
                 Ok(bars) => {
                     result.insert(sym.to_string(), bars);
                 }

@@ -24,6 +24,7 @@ fn make_trading_config() -> TradingConfig {
         allowed_tickers: None,
         blocked_tickers: vec!["GME".into(), "AMC".into(), "BBBY".into()],
         dry_run: true,
+        watchlist: vec!["AAPL".into(), "MSFT".into()],
     }
 }
 
@@ -838,20 +839,20 @@ mod schwab_integration {
     /// Run with: cargo test schwab_integration::get_holdings -- --ignored --nocapture
     ///
     /// Requires:
-    ///   - SCHWAB_APP_KEY and SCHWAB_APP_SECRET env vars
-    ///   - SCHWAB_REDIRECT_URI env var
+    ///   - SCHWAB__APP_KEY and SCHWAB__APP_SECRET env vars
+    ///   - SCHWAB__REDIRECT_URI env var
     ///   - A browser to complete the OAuth flow
     #[tokio::test]
     #[ignore]
     async fn get_holdings() {
         dotenvy::dotenv().ok();
 
-        let app_key = std::env::var("SCHWAB_APP_KEY")
-            .expect("SCHWAB_APP_KEY env var required");
-        let app_secret = std::env::var("SCHWAB_APP_SECRET")
-            .expect("SCHWAB_APP_SECRET env var required");
-        let redirect_uri = std::env::var("SCHWAB_REDIRECT_URI")
-            .expect("SCHWAB_REDIRECT_URI env var required");
+        let app_key = std::env::var("SCHWAB__APP_KEY")
+            .expect("SCHWAB__APP_KEY env var required");
+        let app_secret = std::env::var("SCHWAB__APP_SECRET")
+            .expect("SCHWAB__APP_SECRET env var required");
+        let redirect_uri = std::env::var("SCHWAB__REDIRECT_URI")
+            .expect("SCHWAB__REDIRECT_URI env var required");
 
         let config = SchwabConfig {
             app_key: SecretString::from(app_key),
@@ -1044,14 +1045,14 @@ mod news_integration {
     /// Run with: cargo test news_integration::fetch_news -- --ignored --nocapture
     ///
     /// Requires:
-    ///   - NEWS_API_KEY env var (get one at https://newsapi.org)
+    ///   - DATA_SOURCES__NEWS_API_KEY env var (get one at https://newsapi.org)
     #[tokio::test]
     #[ignore]
     async fn fetch_news() {
         dotenvy::dotenv().ok();
 
-        let api_key = std::env::var("NEWS_API_KEY")
-            .expect("NEWS_API_KEY env var required");
+        let api_key = std::env::var("DATA_SOURCES__NEWS_API_KEY")
+            .expect("DATA_SOURCES__NEWS_API_KEY env var required");
 
         let config = DataSourcesConfig {
             news_api_key: Some(SecretString::from(api_key)),

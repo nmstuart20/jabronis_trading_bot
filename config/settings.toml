@@ -10,6 +10,28 @@ max_daily_loss_dollars = 100
 day_trade_limit = 3
 blocked_tickers = ["GME", "AMC", "BBBY"]
 dry_run = true
+watchlist = [
+    # Large-cap core
+    "AAPL", "GOOGL", "MSFT", "AMZN", "NVDA", "META", "TSLA",
+    # ETFs
+    "SPY", "QQQ", "IWM",
+    # Semiconductors
+    "AMD", "MRVL", "AVGO", "SMCI", "ARM",
+    # Growth / high-beta
+    "PLTR", "NET", "DDOG", "CRWD", "SNOW",
+    # Small / mid-cap high-upside
+    "IONQ", "RGTI", "RKLB", "LUNR", "AEHR",
+    "SOUN", "BBAI", "JOBY", "ACHR", "ASTS",
+    # Biotech / pharma
+    "CRSP", "BEAM", "NTLA", "VERV", "RXRX",
+    # Energy / commodities
+    "UUUU", "SMR", "OKLO", "LEU",
+    # Fintech / crypto-adjacent
+    "COIN", "HOOD", "MSTR", "MARA",
+    # Defense / aerospace
+    "LMT", "RTX", "NOC", "GD", "LHX",
+    "KTOS", "RCAT", "PLTR", "LDOS", "BAH",
+]
 
 state_path = "data/state.json"
 
