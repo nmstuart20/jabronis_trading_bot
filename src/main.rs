@@ -207,38 +207,46 @@ async fn run_trade_session(mode: TradingMode, force_dry_run: bool) -> anyhow::Re
         })
         .await;
 
-    // Parse response
-    let decision = ResponseParser::parse(&response)?;
+    // Parse response as a plan (supports single action or SELL+BUY pair)
+    let plan = ResponseParser::parse_plan(&response)?;
 
-    println!(
-        "Decision: {:?} {} ({})",
-        decision.action,
-        decision.ticker.as_deref().unwrap_or("-"),
-        decision.reasoning
-    );
+    for (i, action) in plan.actions.iter().enumerate() {
+        println!(
+            "Action {}: {:?} {} ({})",
+            i + 1,
+            action.action,
+            action.ticker.as_deref().unwrap_or("-"),
+            action.reasoning
+        );
+    }
 
     let _ = audit
         .log(AuditEntry {
             timestamp: chrono::Utc::now(),
             event_type: AuditEventType::TradeDecision,
             details: serde_json::json!({
-                "action": format!("{:?}", decision.action),
-                "ticker": decision.ticker,
-                "quantity": decision.quantity,
-                "reasoning": decision.reasoning,
+                "plan_size": plan.actions.len(),
+                "actions": plan.actions.iter().map(|a| serde_json::json!({
+                    "action": format!("{:?}", a.action),
+                    "ticker": a.ticker,
+                    "quantity": a.quantity,
+                    "reasoning": a.reasoning,
+                })).collect::<Vec<_>>(),
             }),
         })
         .await;
 
-    // Execute
-    match executor.execute(decision, &portfolio).await {
-        Ok(result) => {
-            println!("Result: {result:?}");
+    // Execute plan (sequentially: SELL first if needed, then BUY)
+    match executor.execute_plan(plan, &portfolio).await {
+        Ok(results) => {
+            for result in &results {
+                println!("Result: {result:?}");
+            }
             let _ = audit
                 .log(AuditEntry {
                     timestamp: chrono::Utc::now(),
                     event_type: AuditEventType::OrderSubmitted,
-                    details: serde_json::json!({"result": format!("{:?}", result)}),
+                    details: serde_json::json!({"results": results.iter().map(|r| format!("{r:?}")).collect::<Vec<_>>()}),
                 })
                 .await;
         }

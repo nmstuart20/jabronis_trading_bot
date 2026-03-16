@@ -1,6 +1,8 @@
 use crate::llm::sanitizer::MarketContext;
 use crate::trading::decision::TradingConstraints;
 use crate::trading::portfolio::Portfolio;
+use rust_decimal::Decimal;
+
 pub struct PromptBuilder;
 
 impl PromptBuilder {
@@ -43,6 +45,9 @@ impl PromptBuilder {
             _ => "",
         };
 
+        // Build a cash warning if cash is low relative to positions held
+        let cash_warning = Self::build_cash_warning(portfolio);
+
         format!(
             r#"You are a trading assistant. Analyze the market data and decide on a trading action.
 {mode_instructions}
@@ -50,19 +55,27 @@ impl PromptBuilder {
 Cash Available: ${cash}
 Positions:
 {positions}
-
+{cash_warning}
 ## Constraints (STRICTLY ENFORCED - you cannot override these)
 - Max position size: ${max_pos} or {max_pct}% of portfolio
 - Remaining day trades this week: {day_trades_left}
 - Max daily loss remaining: ${loss_remaining}
 - Allowed to trade: {allowed}
+- **A BUY order WILL BE REJECTED if its cost exceeds Cash Available (${cash}).** If you want to BUY but lack cash, you MUST use the two-action plan format to SELL a position first.
 
 ## Current Market Data
 {market_context}
 
 ## Your Task
-Analyze the data and recommend ONE action. You must respond with ONLY a JSON object in this exact format:
+Analyze the data and recommend an action. You must respond with ONLY a JSON object.
 
+IMPORTANT RULES:
+1. You CANNOT buy shares costing more than your Cash Available (${cash}). Any such order will fail.
+2. If you want to BUY but do not have enough cash, you MUST sell an existing position first using the two-action plan format below.
+3. When using the two-action plan, the SELL must free up enough cash to cover the BUY.
+4. If you have no positions to sell and no cash, you MUST respond with HOLD.
+
+**Single action format** (for HOLD, a standalone BUY with enough cash, or a standalone SELL):
 ```json
 {{
   "action": "BUY" | "SELL" | "HOLD",
@@ -74,10 +87,35 @@ Analyze the data and recommend ONE action. You must respond with ONLY a JSON obj
 }}
 ```
 
+**Two-action plan format** (SELL then BUY when cash is insufficient):
+```json
+{{
+  "actions": [
+    {{
+      "action": "SELL",
+      "ticker": "SYMBOL",
+      "quantity": number,
+      "order_type": "MARKET" | "LIMIT",
+      "limit_price": number | null,
+      "reasoning": "Brief explanation (max 200 chars)"
+    }},
+    {{
+      "action": "BUY",
+      "ticker": "SYMBOL",
+      "quantity": number,
+      "order_type": "MARKET" | "LIMIT",
+      "limit_price": number | null,
+      "reasoning": "Brief explanation (max 200 chars)"
+    }}
+  ]
+}}
+```
+
 If no good opportunity exists, respond with action "HOLD".
 Do not include any text outside the JSON object."#,
             cash = portfolio.cash_available,
             positions = positions_str,
+            cash_warning = cash_warning,
             max_pos = constraints.max_position_dollars,
             max_pct = constraints.max_position_pct,
             day_trades_left = constraints.day_trades_remaining,
@@ -86,5 +124,25 @@ Do not include any text outside the JSON object."#,
             market_context = market_context,
             mode_instructions = mode_instructions,
         )
+    }
+
+    /// Generate a prominent warning when cash is too low to make meaningful purchases.
+    fn build_cash_warning(portfolio: &Portfolio) -> String {
+        let has_positions = !portfolio.positions.is_empty();
+        let low_cash_threshold = Decimal::from(100);
+
+        if portfolio.cash_available < low_cash_threshold && has_positions {
+            format!(
+                "\n⚠ LOW CASH WARNING: You only have ${} in cash. To BUY anything, you MUST SELL an existing position first using the two-action plan format.\n",
+                portfolio.cash_available
+            )
+        } else if portfolio.cash_available < low_cash_threshold && !has_positions {
+            format!(
+                "\n⚠ LOW CASH WARNING: You only have ${} in cash and no positions to sell. You MUST respond with HOLD.\n",
+                portfolio.cash_available
+            )
+        } else {
+            String::new()
+        }
     }
 }

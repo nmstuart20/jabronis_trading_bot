@@ -11,6 +11,19 @@ pub struct LlmDecision {
     pub reasoning: String,
 }
 
+/// A plan consisting of one or more actions to execute sequentially.
+/// Used when the LLM recommends a SELL-then-BUY pair to free up cash.
+#[derive(Debug)]
+pub struct LlmPlan {
+    pub actions: Vec<LlmDecision>,
+}
+
+/// Raw multi-action response format from the LLM.
+#[derive(Debug, Deserialize)]
+struct MultiActionResponse {
+    actions: Vec<LlmDecision>,
+}
+
 #[derive(Debug, serde::Serialize, Deserialize, PartialEq, Clone)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Action {
@@ -39,12 +52,60 @@ pub enum ParseError {
 pub struct ResponseParser;
 
 impl ResponseParser {
+    /// Parse a single-action response (backwards compatible).
     pub fn parse(response: &str) -> Result<LlmDecision, ParseError> {
         let json_str = Self::extract_json(response)?;
         let decision: LlmDecision =
             serde_json::from_str(json_str).map_err(|e| ParseError::InvalidJson(e.to_string()))?;
         Self::validate(&decision)?;
         Ok(decision)
+    }
+
+    /// Parse a response that may contain either a single action or a multi-action plan.
+    /// Returns an `LlmPlan` with 1-2 actions.
+    pub fn parse_plan(response: &str) -> Result<LlmPlan, ParseError> {
+        let json_str = Self::extract_json(response)?;
+
+        // Try multi-action format first: { "actions": [...] }
+        if let Ok(multi) = serde_json::from_str::<MultiActionResponse>(json_str) {
+            if multi.actions.is_empty() {
+                return Err(ParseError::ValidationFailed(
+                    "Actions array must not be empty".into(),
+                ));
+            }
+            if multi.actions.len() > 2 {
+                return Err(ParseError::ValidationFailed(
+                    "Maximum 2 actions allowed per plan".into(),
+                ));
+            }
+            // Validate ordering: if 2 actions, first must be SELL and second must be BUY
+            if multi.actions.len() == 2 {
+                if multi.actions[0].action != Action::Sell {
+                    return Err(ParseError::ValidationFailed(
+                        "First action in a two-action plan must be SELL".into(),
+                    ));
+                }
+                if multi.actions[1].action != Action::Buy {
+                    return Err(ParseError::ValidationFailed(
+                        "Second action in a two-action plan must be BUY".into(),
+                    ));
+                }
+            }
+            for action in &multi.actions {
+                Self::validate(action)?;
+            }
+            return Ok(LlmPlan {
+                actions: multi.actions,
+            });
+        }
+
+        // Fall back to single-action format
+        let decision: LlmDecision =
+            serde_json::from_str(json_str).map_err(|e| ParseError::InvalidJson(e.to_string()))?;
+        Self::validate(&decision)?;
+        Ok(LlmPlan {
+            actions: vec![decision],
+        })
     }
 
     fn extract_json(text: &str) -> Result<&str, ParseError> {

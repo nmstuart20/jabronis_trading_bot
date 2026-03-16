@@ -1,11 +1,12 @@
 use crate::error::{BotError, Result};
-use crate::llm::response::{Action, LlmDecision, LlmOrderType};
+use crate::llm::response::{Action, LlmDecision, LlmOrderType, LlmPlan};
 use crate::schwab::client::SchwabClient;
 use crate::schwab::orders;
 use crate::trading::decision::ExecutionResult;
 use crate::trading::portfolio::Portfolio;
 use crate::trading::rules::{TradeRecord, TradingRules};
 use chrono::Utc;
+use rust_decimal::Decimal;
 use std::sync::Arc;
 
 pub struct TradeExecutor {
@@ -16,6 +17,46 @@ pub struct TradeExecutor {
 impl TradeExecutor {
     pub fn new(schwab: Arc<SchwabClient>, rules: TradingRules) -> Self {
         Self { schwab, rules }
+    }
+
+    /// Execute a plan of 1-2 actions sequentially.
+    /// For a SELL+BUY plan, the sell proceeds are added to a shadow copy of the portfolio
+    /// so the BUY's cash check accounts for the freed-up funds.
+    pub async fn execute_plan(
+        &mut self,
+        plan: LlmPlan,
+        portfolio: &Portfolio,
+    ) -> Result<Vec<ExecutionResult>> {
+        let mut results = Vec::new();
+        let mut shadow_portfolio = portfolio.clone();
+
+        for decision in plan.actions {
+            let result = self.execute(decision, &shadow_portfolio).await?;
+
+            // After a successful SELL, add estimated proceeds to shadow portfolio cash
+            // so the next action (BUY) can pass the cash check.
+            if let ExecutionResult::Executed {
+                quantity, price, ..
+            }
+            | ExecutionResult::DryRun {
+                quantity, price, ..
+            } = &result
+            {
+                // For sells, add proceeds to available cash
+                let trade_value = Decimal::from(*quantity) * price;
+                // Check if this was a sell by looking at the result type context
+                // We recorded the trade, so check the last record
+                if let Some(last) = self.rules.trade_history().last() {
+                    if last.action == Action::Sell {
+                        shadow_portfolio.cash_available += trade_value;
+                    }
+                }
+            }
+
+            results.push(result);
+        }
+
+        Ok(results)
     }
 
     pub async fn execute(
