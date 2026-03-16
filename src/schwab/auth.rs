@@ -362,8 +362,7 @@ impl TokenManager {
         let stored: StoredTokens = serde_json::from_str(&json)?;
 
         // Check if refresh token is still valid
-        let refresh_age =
-            (chrono::Utc::now() - stored.refresh_token_issued).num_seconds();
+        let refresh_age = (chrono::Utc::now() - stored.refresh_token_issued).num_seconds();
         if refresh_age >= REFRESH_TOKEN_LIFETIME_SECS {
             tracing::info!("Stored refresh token has expired, need fresh auth");
             return Err(BotError::TokenExpired);
@@ -376,10 +375,10 @@ impl TokenManager {
             refresh_token_issued: stored.refresh_token_issued,
         };
 
-        let access_remaining =
-            ACCESS_TOKEN_LIFETIME_SECS - (chrono::Utc::now() - token_data.access_token_issued).num_seconds();
-        let refresh_remaining =
-            REFRESH_TOKEN_LIFETIME_SECS - (chrono::Utc::now() - token_data.refresh_token_issued).num_seconds();
+        let access_remaining = ACCESS_TOKEN_LIFETIME_SECS
+            - (chrono::Utc::now() - token_data.access_token_issued).num_seconds();
+        let refresh_remaining = REFRESH_TOKEN_LIFETIME_SECS
+            - (chrono::Utc::now() - token_data.refresh_token_issued).num_seconds();
         tracing::info!(
             "Loaded stored tokens (access expires in {}s, refresh expires in {}s)",
             access_remaining,

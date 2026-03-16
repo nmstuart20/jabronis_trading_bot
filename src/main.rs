@@ -137,7 +137,12 @@ async fn run_trade_session(mode: TradingMode, force_dry_run: bool) -> anyhow::Re
 
     let mut executor = TradeExecutor::new(schwab.clone(), rules);
 
-    let watchlist: Vec<&str> = settings.trading.watchlist.iter().map(|s| s.as_str()).collect();
+    let watchlist: Vec<&str> = settings
+        .trading
+        .watchlist
+        .iter()
+        .map(|s| s.as_str())
+        .collect();
 
     let dry_run_active = force_dry_run || settings.trading.dry_run;
     println!(
@@ -175,7 +180,7 @@ async fn run_trade_session(mode: TradingMode, force_dry_run: bool) -> anyhow::Re
     // Get LLM decision
     let prompt =
         PromptBuilder::build_trading_prompt(&context, &portfolio, &constraints, mode.as_str());
-    
+
     let _ = audit
         .log(AuditEntry {
             timestamp: chrono::Utc::now(),

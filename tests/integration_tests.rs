@@ -27,12 +27,11 @@ mod schwab_integration {
     async fn get_holdings() {
         dotenvy::dotenv().ok();
 
-        let app_key = std::env::var("SCHWAB__APP_KEY")
-            .expect("SCHWAB__APP_KEY env var required");
-        let app_secret = std::env::var("SCHWAB__APP_SECRET")
-            .expect("SCHWAB__APP_SECRET env var required");
-        let redirect_uri = std::env::var("SCHWAB__REDIRECT_URI")
-            .expect("SCHWAB__REDIRECT_URI env var required");
+        let app_key = std::env::var("SCHWAB__APP_KEY").expect("SCHWAB__APP_KEY env var required");
+        let app_secret =
+            std::env::var("SCHWAB__APP_SECRET").expect("SCHWAB__APP_SECRET env var required");
+        let redirect_uri =
+            std::env::var("SCHWAB__REDIRECT_URI").expect("SCHWAB__REDIRECT_URI env var required");
 
         let config = SchwabConfig {
             app_key: SecretString::from(app_key),
@@ -250,7 +249,10 @@ mod news_integration {
 
         println!("\n=== News Articles ({}) ===", articles.len());
         for article in &articles {
-            println!("  [{}] {} - {}", article.source, article.headline, article.published_at);
+            println!(
+                "  [{}] {} - {}",
+                article.source, article.headline, article.published_at
+            );
             if !article.summary.is_empty() {
                 println!("    {}", &article.summary[..article.summary.len().min(100)]);
             }
@@ -278,6 +280,9 @@ mod news_integration {
             .await
             .expect("Should not error without API key");
 
-        assert!(articles.is_empty(), "Should return empty vec without API key");
+        assert!(
+            articles.is_empty(),
+            "Should return empty vec without API key"
+        );
     }
 }

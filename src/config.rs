@@ -72,12 +72,10 @@ fn default_dry_run() -> bool {
 }
 
 fn default_watchlist() -> Vec<String> {
-    vec![
-        "AAPL", "GOOGL", "MSFT", "AMZN", "NVDA", "SPY", "QQQ",
-    ]
-    .into_iter()
-    .map(String::from)
-    .collect()
+    vec!["AAPL", "GOOGL", "MSFT", "AMZN", "NVDA", "SPY", "QQQ"]
+        .into_iter()
+        .map(String::from)
+        .collect()
 }
 
 #[derive(Debug, Deserialize)]

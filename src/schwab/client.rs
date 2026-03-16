@@ -262,7 +262,12 @@ impl SchwabClient {
         let account = self.get_account().await?;
         let positions = account
             .securities_account
-            .map(|sa| sa.positions.into_iter().map(|p| p.into_position()).collect())
+            .map(|sa| {
+                sa.positions
+                    .into_iter()
+                    .map(|p| p.into_position())
+                    .collect()
+            })
             .unwrap_or_default();
         Ok(positions)
     }
