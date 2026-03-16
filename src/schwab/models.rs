@@ -216,3 +216,65 @@ pub enum FrequencyType {
     Weekly,
     Monthly,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::llm::response::Action;
+    use crate::schwab::orders;
+    use rust_decimal::Decimal;
+    use std::str::FromStr;
+
+    #[test]
+    fn order_type_serializes_screaming_snake() {
+        let order = orders::build_market_buy("AAPL", 1);
+        let json = serde_json::to_string(&order).unwrap();
+        assert!(json.contains("\"MARKET\""));
+        assert!(json.contains("\"BUY\""));
+        assert!(json.contains("\"NORMAL\""));
+        assert!(json.contains("\"DAY\""));
+        assert!(json.contains("\"SINGLE\""));
+    }
+
+    #[test]
+    fn limit_order_includes_price() {
+        let order = orders::build_limit_buy("AAPL", 1, Decimal::from_str("150").unwrap());
+        let json = serde_json::to_string(&order).unwrap();
+        assert!(json.contains("\"LIMIT\""));
+        assert!(json.contains("\"price\""));
+    }
+
+    #[test]
+    fn market_order_omits_price() {
+        let order = orders::build_market_buy("AAPL", 1);
+        let json = serde_json::to_string(&order).unwrap();
+        // price field has skip_serializing_if = "Option::is_none"
+        assert!(!json.contains("\"price\""));
+    }
+
+    #[test]
+    fn quote_deserializes_camel_case() {
+        let json = r#"{
+            "symbol": "AAPL",
+            "bidPrice": "149.99",
+            "askPrice": "150.01",
+            "lastPrice": "150.00",
+            "totalVolume": 50000000,
+            "highPrice": "152.00",
+            "lowPrice": "148.00",
+            "openPrice": "149.00",
+            "closePrice": "148.50"
+        }"#;
+        let quote: Quote = serde_json::from_str(json).unwrap();
+        assert_eq!(quote.symbol, "AAPL");
+        assert_eq!(quote.bid_price, Decimal::from_str("149.99").unwrap());
+        assert_eq!(quote.total_volume, 50_000_000);
+    }
+
+    #[test]
+    fn llm_action_deserializes_screaming() {
+        let json = r#""BUY""#;
+        let action: Action = serde_json::from_str(json).unwrap();
+        assert_eq!(action, Action::Buy);
+    }
+}
