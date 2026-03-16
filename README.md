@@ -4,7 +4,16 @@ LLM-powered trading bot that uses Claude as an advisory-only signal. All trading
 
 Dry-run mode is enabled by default. No real orders are placed unless you explicitly disable it in config.
 
-## Setup
+## Schwab API Setup
+1. [Create a Schwab developer account.](https://developer.schwab.com/login) Use the same email as in your Schwab brokerage account.
+2. Request access to the Trader API [- Individual API product.](https://developer.schwab.com/products/trader-api--individual)
+3. Make a new Schwab individual developer app in the dashboard with callback URL that matches the app (ex: https://127.0.0.1:7777)
+4. Callback URLs must be https and localhost addresses.
+5. Add both API products to the app: "Accounts and Trading Production" and "Market Data Production". Both are needed for full functionality. If you didn't during app creation: Apps Dashboard > View Details > Modify App > APIs.
+6. Wait until the app status is "Ready for use" (this can take a couple days). Note that "Approved - Pending" will not work.
+
+
+## App Setup
 
 1. Copy `.env.example` to `.env` and fill in your credentials:
 
@@ -86,8 +95,5 @@ This bot is designed to be invoked by an external scheduler (e.g., cron) rather 
 ## Development
 
 ```bash
-cargo test                                    # Run all tests
-cargo clippy --all-targets --all-features     # Lint
-cargo fmt                                     # Format
 RUST_LOG=debug cargo run -- trade --mode manual --dry-run  # Run with debug logging
 ```
