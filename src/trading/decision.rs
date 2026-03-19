@@ -1,3 +1,4 @@
+use crate::schwab::models::PreviewOrderResponse;
 use rust_decimal::Decimal;
 
 #[derive(Debug, Clone)]
@@ -26,5 +27,6 @@ pub enum ExecutionResult {
         quantity: u32,
         price: Decimal,
         reason: String,
+        preview: Box<Option<PreviewOrderResponse>>,
     },
 }

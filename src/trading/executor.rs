@@ -128,13 +128,48 @@ impl TradeExecutor {
 
         // Dry run mode
         if self.rules.is_dry_run() {
-            tracing::info!(
-                ticker = ticker,
-                action = ?decision.action,
-                quantity = quantity,
-                price = %quote.last_price,
-                "DRY RUN - would have placed order"
-            );
+            // Build the order and preview it through Schwab's API
+            let order = match (&decision.action, &decision.order_type) {
+                (Action::Buy, LlmOrderType::Market) => orders::build_market_buy(ticker, quantity),
+                (Action::Sell, LlmOrderType::Market) => orders::build_market_sell(ticker, quantity),
+                (Action::Buy, LlmOrderType::Limit) => {
+                    let price = decision
+                        .limit_price
+                        .ok_or_else(|| BotError::Other("Limit order missing price".into()))?;
+                    orders::build_limit_buy(ticker, quantity, price)
+                }
+                (Action::Sell, LlmOrderType::Limit) => {
+                    let price = decision
+                        .limit_price
+                        .ok_or_else(|| BotError::Other("Limit order missing price".into()))?;
+                    orders::build_limit_sell(ticker, quantity, price)
+                }
+                (Action::Hold, _) => unreachable!(),
+            };
+
+            let preview = match self.schwab.preview_order(&order).await {
+                Ok(p) => {
+                    tracing::info!(
+                        ticker = ticker,
+                        action = ?decision.action,
+                        quantity = quantity,
+                        price = %quote.last_price,
+                        preview = ?p,
+                        "DRY RUN - previewed order"
+                    );
+                    Some(p)
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        ticker = ticker,
+                        action = ?decision.action,
+                        error = %e,
+                        "DRY RUN - preview failed, continuing without preview"
+                    );
+                    None
+                }
+            };
+
             self.rules.record_trade(TradeRecord {
                 timestamp: Utc::now(),
                 ticker: ticker.clone(),
@@ -148,6 +183,7 @@ impl TradeExecutor {
                 quantity,
                 price: quote.last_price,
                 reason: decision.reasoning,
+                preview: Box::new(preview),
             });
         }
 
