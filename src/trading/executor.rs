@@ -1,6 +1,7 @@
 use crate::error::{BotError, Result};
 use crate::llm::response::{Action, LlmDecision, LlmOrderType, LlmPlan};
 use crate::schwab::client::SchwabClient;
+use crate::schwab::models::PreviewOrderResponse;
 use crate::schwab::orders;
 use crate::trading::decision::ExecutionResult;
 use crate::trading::portfolio::Portfolio;
@@ -57,6 +58,48 @@ impl TradeExecutor {
         }
 
         Ok(results)
+    }
+
+    /// Preview an order through Schwab's API without placing it.
+    /// Validates rules locally, builds the order, and sends it to Schwab's
+    /// preview endpoint to check for rejects, warnings, and estimated fees.
+    pub async fn preview(
+        &self,
+        decision: &LlmDecision,
+        portfolio: &Portfolio,
+    ) -> Result<PreviewOrderResponse> {
+        if decision.action == Action::Hold {
+            return Err(BotError::Other("Cannot preview a HOLD action".into()));
+        }
+
+        let ticker = decision
+            .ticker
+            .as_ref()
+            .ok_or_else(|| BotError::Other("Missing ticker for BUY/SELL".into()))?;
+
+        let quote = self.schwab.get_quote(ticker).await?;
+        self.rules.validate_trade(decision, portfolio, &quote)?;
+
+        let quantity = decision.quantity.unwrap_or(0);
+        let order = match (&decision.action, &decision.order_type) {
+            (Action::Buy, LlmOrderType::Market) => orders::build_market_buy(ticker, quantity),
+            (Action::Sell, LlmOrderType::Market) => orders::build_market_sell(ticker, quantity),
+            (Action::Buy, LlmOrderType::Limit) => {
+                let price = decision
+                    .limit_price
+                    .ok_or_else(|| BotError::Other("Limit order missing price".into()))?;
+                orders::build_limit_buy(ticker, quantity, price)
+            }
+            (Action::Sell, LlmOrderType::Limit) => {
+                let price = decision
+                    .limit_price
+                    .ok_or_else(|| BotError::Other("Limit order missing price".into()))?;
+                orders::build_limit_sell(ticker, quantity, price)
+            }
+            (Action::Hold, _) => unreachable!(),
+        };
+
+        self.schwab.preview_order(&order).await
     }
 
     pub async fn execute(

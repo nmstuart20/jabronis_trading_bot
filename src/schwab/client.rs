@@ -192,6 +192,24 @@ impl SchwabClient {
         Ok(resp.json().await?)
     }
 
+    pub async fn preview_order(&self, order: &Order) -> Result<PreviewOrderResponse> {
+        let account_hash = self.get_account_hash().await?;
+        let auth = self.auth_header().await?;
+        let resp = self
+            .http
+            .post(format!(
+                "{}/accounts/{}/previewOrder",
+                self.base_url, account_hash
+            ))
+            .header("Authorization", &auth)
+            .header("Content-Type", "application/json")
+            .json(order)
+            .send()
+            .await?;
+        let resp = self.check_response(resp).await?;
+        Ok(resp.json().await?)
+    }
+
     pub async fn place_order(&self, order: &Order) -> Result<OrderResponse> {
         let account_hash = self.get_account_hash().await?;
         let auth = self.auth_header().await?;

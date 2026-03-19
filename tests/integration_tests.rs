@@ -110,6 +110,96 @@ mod schwab_integration {
             );
         }
     }
+
+    /// Integration test that previews an order through Schwab's API without placing it.
+    /// Validates that order construction and the preview endpoint work end-to-end.
+    ///
+    /// Run with: cargo test schwab_integration::preview_order -- --ignored --nocapture
+    ///
+    /// Requires:
+    ///   - SCHWAB__APP_KEY and SCHWAB__APP_SECRET env vars
+    ///   - SCHWAB__REDIRECT_URI env var
+    ///   - A browser to complete the OAuth flow
+    #[tokio::test]
+    #[ignore]
+    async fn preview_order() {
+        use rust_decimal::Decimal;
+        use schwab_bot::schwab::orders;
+        use std::str::FromStr;
+
+        dotenvy::dotenv().ok();
+
+        let app_key = std::env::var("SCHWAB__APP_KEY")
+            .expect("SCHWAB__APP_KEY env var required");
+        let app_secret = std::env::var("SCHWAB__APP_SECRET")
+            .expect("SCHWAB__APP_SECRET env var required");
+        let redirect_uri = std::env::var("SCHWAB__REDIRECT_URI")
+            .expect("SCHWAB__REDIRECT_URI env var required");
+
+        let config = SchwabConfig {
+            app_key: SecretString::from(app_key),
+            app_secret: SecretString::from(app_secret),
+            redirect_uri,
+        };
+
+        let client = SchwabClient::new(&config)
+            .await
+            .expect("Failed to create client");
+
+        client
+            .ensure_authenticated()
+            .await
+            .expect("Authentication failed");
+
+        // Preview a small limit buy far below market — will never fill
+        let order = orders::build_limit_buy("OCUL", 1, Decimal::from_str("8.80").unwrap());
+        let preview = client
+            .preview_order(&order)
+            .await
+            .expect("Preview order failed");
+
+        println!("\n=== Order Preview ===");
+        if let Some(strategy) = &preview.order_strategy {
+            println!("  Status: {:?}", strategy.status);
+            for leg in &strategy.order_legs {
+                println!(
+                    "  Leg: {} {} @ bid={:?} ask={:?} last={:?}, commission={:?}",
+                    leg.instruction.as_deref().unwrap_or("?"),
+                    leg.final_symbol.as_deref().unwrap_or("?"),
+                    leg.bid_price,
+                    leg.ask_price,
+                    leg.last_price,
+                    leg.projected_commission,
+                );
+            }
+        }
+        if let Some(validation) = &preview.order_validation_result {
+            if !validation.accepts.is_empty() {
+                println!("  Accepts:");
+                for msg in &validation.accepts {
+                    println!("    - {}", msg.message.as_deref().unwrap_or("(no message)"));
+                }
+            }
+            if !validation.warns.is_empty() {
+                println!("  Warnings:");
+                for msg in &validation.warns {
+                    println!("    - {}", msg.message.as_deref().unwrap_or("(no message)"));
+                }
+            }
+            if !validation.rejects.is_empty() {
+                println!("  Rejects:");
+                for msg in &validation.rejects {
+                    println!("    - {}", msg.message.as_deref().unwrap_or("(no message)"));
+                }
+            }
+            // A limit buy at $1 for AAPL should be accepted (just won't fill)
+            assert!(
+                validation.rejects.is_empty(),
+                "Order was rejected: {:?}",
+                validation.rejects
+            );
+        }
+    }
 }
 
 // ---------------------------------------

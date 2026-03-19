@@ -183,6 +183,79 @@ pub struct OrderResponse {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct PreviewOrderResponse {
+    #[serde(default)]
+    pub order_id: i64,
+    #[serde(default)]
+    pub order_strategy: Option<PreviewOrderStrategy>,
+    #[serde(default)]
+    pub order_validation_result: Option<OrderValidationResult>,
+    #[serde(default)]
+    pub commission_and_fee: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewOrderStrategy {
+    #[serde(default)]
+    pub session: Option<String>,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub quantity: Option<f64>,
+    #[serde(default)]
+    pub price: Option<f64>,
+    #[serde(default)]
+    pub order_legs: Vec<PreviewOrderLeg>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewOrderLeg {
+    #[serde(default)]
+    pub ask_price: Option<f64>,
+    #[serde(default)]
+    pub bid_price: Option<f64>,
+    #[serde(default)]
+    pub last_price: Option<f64>,
+    #[serde(default)]
+    pub projected_commission: Option<f64>,
+    #[serde(default)]
+    pub quantity: Option<f64>,
+    #[serde(default)]
+    pub final_symbol: Option<String>,
+    #[serde(default)]
+    pub instruction: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OrderValidationResult {
+    #[serde(default)]
+    pub alerts: Vec<ValidationMessage>,
+    #[serde(default)]
+    pub accepts: Vec<ValidationMessage>,
+    #[serde(default)]
+    pub rejects: Vec<ValidationMessage>,
+    #[serde(default)]
+    pub reviews: Vec<ValidationMessage>,
+    #[serde(default)]
+    pub warns: Vec<ValidationMessage>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ValidationMessage {
+    #[serde(default)]
+    pub validation_rule_name: Option<String>,
+    #[serde(default)]
+    pub message: Option<String>,
+    #[serde(default)]
+    pub activity_message: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PriceHistory {
     pub symbol: String,
     pub candles: Vec<Candle>,
