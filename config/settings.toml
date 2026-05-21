@@ -1,5 +1,5 @@
 [anthropic]
-model = "claude-sonnet-4-20250514"
+model = "claude-opus-4-7"
 max_tokens = 1024
 
 [trading]
@@ -13,24 +13,38 @@ dry_run = true
 watchlist = [
     # Large-cap core
     "AAPL", "GOOGL", "MSFT", "AMZN", "NVDA", "META", "TSLA",
+    "NFLX", "ORCL", "ADBE", "CRM", "INTC", "CSCO", "IBM",
     # ETFs
-    "SPY", "QQQ", "IWM",
+    "SPY", "QQQ", "IWM", "DIA", "VTI", "XLK", "XLF", "XLE", "XLV", "ARKK",
     # Semiconductors
     "AMD", "MRVL", "AVGO", "SMCI", "ARM",
+    "TSM", "MU", "QCOM", "TXN", "LRCX", "AMAT", "ASML", "KLAC",
     # Growth / high-beta
     "NET", "DDOG", "CRWD", "SNOW",
+    "MDB", "ZS", "PANW", "NOW", "SHOP", "SQ", "PYPL", "UBER", "ABNB",
     # Small / mid-cap high-upside
     "IONQ", "RGTI", "RKLB", "LUNR", "AEHR",
     "SOUN", "BBAI", "JOBY", "ACHR", "ASTS",
+    "QBTS", "QUBT", "PATH", "AI", "SERV",
     # Biotech / pharma
     "CRSP", "BEAM", "NTLA", "VERV", "RXRX",
+    "MRNA", "PFE", "LLY", "NVO", "REGN", "VRTX", "GILD",
     # Energy / commodities
     "UUUU", "SMR", "OKLO", "LEU",
+    "XOM", "CVX", "COP", "OXY", "SLB", "EQT", "NEE",
     # Fintech / crypto-adjacent
     "COIN", "HOOD", "MSTR", "MARA",
+    "RIOT", "CLSK", "BITF", "SOFI", "AFRM",
     # Defense / aerospace
     "LMT", "RTX", "NOC", "GD", "LHX",
     "KTOS", "RCAT", "PLTR", "LDOS", "BAH",
+    "BA", "HII", "TXT", "AVAV",
+    # Consumer / retail
+    "WMT", "COST", "TGT", "HD", "LOW", "NKE", "SBUX", "MCD", "DIS",
+    # Financials
+    "JPM", "BAC", "GS", "MS", "WFC", "C", "V", "MA", "AXP", "BLK",
+    # Industrials / autos
+    "F", "GM", "RIVN", "LCID", "CAT", "DE", "GE", "HON",
 ]
 
 state_path = "data/state.json"
